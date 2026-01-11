@@ -1,0 +1,9 @@
+services:
+  - type: web
+    name: object-detection-app
+    runtime: python3
+    buildCommand: pip install -r requirements.txt
+    startCommand: python -m eventlet -- app:app
+    envVars:
+      - key: FLASK_ENV
+        value: production
