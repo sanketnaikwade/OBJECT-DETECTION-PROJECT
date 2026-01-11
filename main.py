@@ -1,3 +1,7 @@
+import eventlet
+eventlet.monkey_patch()  # This MUST stay at the very top (Line 2)
+
+import os
 from flask import Flask, request, render_template, send_file, jsonify
 from flask_socketio import SocketIO, emit
 from ultralytics import YOLO
@@ -8,13 +12,15 @@ import io
 from PIL import Image
 
 app = Flask(__name__)
-socketio = SocketIO(app, cors_allowed_origins="*")
+# Explicitly set async_mode to eventlet to avoid context errors
+socketio = SocketIO(app, cors_allowed_origins="*", async_mode='eventlet')
 
 # Load YOLO model
 MODEL_PATH = "yolov8n.pt"
 model = YOLO(MODEL_PATH)
+model.to('cpu')
 
-# Object width ratios (same as before)
+# Object width ratios
 class_avg_sizes = {
     "person": {"width_ratio": 2.5},
     "car": {"width_ratio": 0.37},
@@ -46,12 +52,10 @@ def blur_person(img, box):
 @socketio.on('process_frame')
 def handle_frame(data):
     try:
-        # Decode base64 image
         image_data = base64.b64decode(data['image'].split(',')[1])
         image = Image.open(io.BytesIO(image_data))
         frame = cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
 
-        # Process frame
         results = model(frame, conf=0.4)[0]
 
         for box in results.boxes:
@@ -71,7 +75,6 @@ def handle_frame(data):
             cv2.putText(frame, f"{label} - {dist}m", (coords[0], coords[1] - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 2)
 
-        # Encode back to base64
         _, buffer = cv2.imencode('.jpg', frame)
         processed_image = base64.b64encode(buffer).decode('utf-8')
         emit('processed_frame', {'image': 'data:image/jpeg;base64,' + processed_image})
@@ -92,15 +95,12 @@ def upload():
     if file.filename == '':
         return jsonify({'error': 'No file selected'}), 400
 
-    # Save uploaded file temporarily
     import tempfile
-    import os
     temp_dir = tempfile.mkdtemp()
     input_path = os.path.join(temp_dir, 'input.mp4')
     output_path = os.path.join(temp_dir, 'output.avi')
     file.save(input_path)
 
-    # Process video
     cap = cv2.VideoCapture(input_path)
     fourcc = cv2.VideoWriter_fourcc(*'XVID')
     out = cv2.VideoWriter(output_path, fourcc, 20, (int(cap.get(3)), int(cap.get(4))))
@@ -137,4 +137,6 @@ def upload():
     return send_file(output_path, as_attachment=True, download_name='processed_video.avi')
 
 if __name__ == '__main__':
-    socketio.run(app, debug=True)
+    # Use the port Render assigns, fallback to 10000
+    port = int(os.environ.get("PORT", 10000))
+    socketio.run(app, host='0.0.0.0', port=port)
