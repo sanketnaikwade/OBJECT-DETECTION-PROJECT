@@ -3,231 +3,138 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Object Detection Web App</title>
+    <title>Live Object Detection</title>
     <script src="https://cdn.socket.io/4.7.2/socket.io.min.js"></script>
+
     <style>
         body {
             font-family: Arial, sans-serif;
-            max-width: 1000px;
-            margin: 0 auto;
+            max-width: 900px;
+            margin: auto;
             padding: 20px;
-            background-color: #f5f5f5;
+            background: #f5f5f5;
         }
         h1 {
-            color: #333;
             text-align: center;
         }
         .section {
-            background-color: white;
+            background: white;
             padding: 20px;
             border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-            margin-bottom: 20px;
-        }
-        .upload-form, .webcam-section {
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-        }
-        input[type="file"] {
-            padding: 8px;
-            border: 1px solid #ddd;
-            border-radius: 4px;
-        }
-        button {
-            background-color: #4CAF50;
-            color: white;
-            padding: 10px 15px;
-            border: none;
-            border-radius: 4px;
-            cursor: pointer;
-            font-size: 16px;
-        }
-        button:hover {
-            background-color: #45a049;
-        }
-        button:disabled {
-            background-color: #cccccc;
-            cursor: not-allowed;
-        }
-        .loading {
-            display: none;
-            text-align: center;
-            margin-top: 20px;
-        }
-        .result {
-            display: none;
-            text-align: center;
-            margin-top: 20px;
-        }
-        .description {
-            background-color: white;
-            padding: 15px;
-            border-radius: 8px;
-            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
         }
         video, canvas {
-            max-width: 100%;
+            width: 100%;
+            border-radius: 6px;
             border: 1px solid #ddd;
-            border-radius: 4px;
         }
         .controls {
-            display: flex;
-            gap: 10px;
-            justify-content: center;
+            text-align: center;
             margin-top: 10px;
+        }
+        button {
+            padding: 10px 16px;
+            border: none;
+            border-radius: 5px;
+            background: #4CAF50;
+            color: white;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 5px;
+        }
+        button:disabled {
+            background: #aaa;
+            cursor: not-allowed;
+        }
+        #status {
+            text-align: center;
+            margin-top: 10px;
+            font-weight: bold;
         }
     </style>
 </head>
+
 <body>
-    <h1>Object Detection with Distance Estimation</h1>
-    
-    <div class="description">
-        <p>Choose an option: Upload a video file for batch processing, or use real-time webcam detection.</p>
-        <p><strong>Supported objects:</strong> person, car, bicycle, motorcycle, bus, traffic light, stop sign, bench, cat, dog</p>
+
+<h1>Live Object Detection & Distance Estimation</h1>
+
+<div class="section">
+    <video id="video" autoplay playsinline></video>
+    <canvas id="canvas" style="display:none;"></canvas>
+
+    <div class="controls">
+        <button id="startBtn">Start Webcam</button>
+        <button id="stopBtn" disabled>Stop</button>
     </div>
 
-    <div class="section">
-        <h2>Video Upload Processing</h2>
-        <form id="uploadForm" class="upload-form" enctype="multipart/form-data">
-            <label for="videoFile">Select Video File:</label>
-            <input type="file" id="videoFile" name="file" accept="video/*" required>
-            <button type="submit" id="uploadBtn">Process Video</button>
-        </form>
-        
-        <div id="loading" class="loading">
-            <p>Processing video... This may take a few minutes depending on video length.</p>
-        </div>
-        
-        <div id="result" class="result">
-            <p>Processing complete! Downloading processed video...</p>
-        </div>
-    </div>
+    <p id="status">Click "Start Webcam" to begin detection</p>
+</div>
 
-    <div class="section">
-        <h2>Real-Time Webcam Processing</h2>
-        <div class="webcam-section">
-            <video id="video" autoplay playsinline></video>
-            <canvas id="canvas" style="display: none;"></canvas>
-            <div class="controls">
-                <button id="startBtn">Start Webcam</button>
-                <button id="stopBtn" disabled>Stop</button>
-            </div>
-            <p id="status">Click "Start Webcam" to begin real-time object detection.</p>
-        </div>
-    </div>
+<script>
+    const socket = io();
 
-    <script>
-        const socket = io();
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const startBtn = document.getElementById('startBtn');
-        const stopBtn = document.getElementById('stopBtn');
-        const status = document.getElementById('status');
-        let stream;
-        let intervalId;
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
 
-        socket.on('processed_frame', (data) => {
-            const img = new Image();
-            img.onload = () => {
-                ctx.clearRect(0, 0, canvas.width, canvas.height);
-                ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-                video.style.display = 'none';
-                canvas.style.display = 'block';
-            };
-            img.src = data.image;
-        });
+    const startBtn = document.getElementById('startBtn');
+    const stopBtn = document.getElementById('stopBtn');
+    const status = document.getElementById('status');
 
-        socket.on('error', (data) => {
-            status.textContent = 'Error: ' + data.message;
-        });
+    let stream;
+    let intervalId;
 
-        startBtn.addEventListener('click', async () => {
-            try {
-                stream = await navigator.mediaDevices.getUserMedia({ video: true });
-                video.srcObject = stream;
-                video.style.display = 'block';
-                canvas.style.display = 'none';
-                
-                canvas.width = 640;
-                canvas.height = 480;
-                
-                startBtn.disabled = true;
-                stopBtn.disabled = false;
-                status.textContent = 'Processing real-time video...';
-                
-                intervalId = setInterval(() => {
-                    ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-                    const imageData = canvas.toDataURL('image/jpeg', 0.8);
-                    socket.emit('process_frame', { image: imageData });
-                }, 100); // Send frame every 100ms
-                
-            } catch (error) {
-                status.textContent = 'Error accessing webcam: ' + error.message;
-            }
-        });
-
-        stopBtn.addEventListener('click', () => {
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            clearInterval(intervalId);
+    socket.on('processed_frame', (data) => {
+        const img = new Image();
+        img.onload = () => {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
             video.style.display = 'none';
-            canvas.style.display = 'none';
-            startBtn.disabled = false;
-            stopBtn.disabled = true;
-            status.textContent = 'Webcam stopped.';
-        });
+            canvas.style.display = 'block';
+        };
+        img.src = data.image;
+    });
 
-        // Upload form handling (same as before)
-        const form = document.getElementById('uploadForm');
-        const uploadBtn = document.getElementById('uploadBtn');
-        const loading = document.getElementById('loading');
-        const result = document.getElementById('result');
+    socket.on('error', (data) => {
+        status.textContent = "Error: " + data.message;
+    });
 
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            
-            const formData = new FormData(form);
-            
-            uploadBtn.disabled = true;
-            uploadBtn.textContent = 'Processing...';
-            loading.style.display = 'block';
-            result.style.display = 'none';
-            
-            try {
-                const response = await fetch('/upload', {
-                    method: 'POST',
-                    body: formData
-                });
-                
-                if (response.ok) {
-                    loading.style.display = 'none';
-                    result.style.display = 'block';
-                    
-                    // Trigger download
-                    const blob = await response.blob();
-                    const url = window.URL.createObjectURL(blob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = 'processed_video.avi';
-                    document.body.appendChild(a);
-                    a.click();
-                    window.URL.revokeObjectURL(url);
-                    document.body.removeChild(a);
-                } else {
-                    const error = await response.json();
-                    alert('Error: ' + error.error);
-                }
-            } catch (error) {
-                alert('Error uploading file: ' + error.message);
-            } finally {
-                uploadBtn.disabled = false;
-                uploadBtn.textContent = 'Process Video';
-                loading.style.display = 'none';
-            }
-        });
-    </script>
+    startBtn.addEventListener('click', async () => {
+        try {
+            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            video.srcObject = stream;
+
+            canvas.width = 640;
+            canvas.height = 480;
+
+            startBtn.disabled = true;
+            stopBtn.disabled = false;
+            status.textContent = "Live detection running...";
+
+            intervalId = setInterval(() => {
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                const imgData = canvas.toDataURL('image/jpeg', 0.7);
+                socket.emit('process_frame', { image: imgData });
+            }, 800);   // SAFE interval (server friendly)
+
+        } catch (err) {
+            status.textContent = "Camera error: " + err.message;
+        }
+    });
+
+    stopBtn.addEventListener('click', () => {
+        if (stream) {
+            stream.getTracks().forEach(t => t.stop());
+        }
+        clearInterval(intervalId);
+
+        video.style.display = 'none';
+        canvas.style.display = 'none';
+
+        startBtn.disabled = false;
+        stopBtn.disabled = true;
+        status.textContent = "Webcam stopped";
+    });
+</script>
+
 </body>
 </html>
