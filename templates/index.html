@@ -100,7 +100,14 @@
 
     startBtn.addEventListener('click', async () => {
         try {
-            stream = await navigator.mediaDevices.getUserMedia({ video: true });
+            stream = await navigator.mediaDevices.getUserMedia({
+                video: {
+                    width: { ideal: 640 },
+                    height: { ideal: 480 },
+                    frameRate: { ideal: 15 }
+                }
+            });
+
             video.srcObject = stream;
 
             canvas.width = 640;
@@ -114,7 +121,7 @@
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
                 const imgData = canvas.toDataURL('image/jpeg', 0.7);
                 socket.emit('process_frame', { image: imgData });
-            }, 800);   // SAFE interval (server friendly)
+            }, 800);   // SAFE interval
 
         } catch (err) {
             status.textContent = "Camera error: " + err.message;
