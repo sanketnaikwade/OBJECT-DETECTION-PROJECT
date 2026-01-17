@@ -29,8 +29,15 @@ socketio = SocketIO(app, cors_allowed_origins="*", async_mode="eventlet")
 # LOAD YOLO MODEL
 # ===============================
 MODEL_PATH = "yolov8n.pt"
-model = YOLO(MODEL_PATH)
-model.to("cpu")
+print(f"Loading YOLO model from: {os.path.abspath(MODEL_PATH)}")
+print(f"Model file exists: {os.path.exists(MODEL_PATH)}")
+try:
+    model = YOLO(MODEL_PATH)
+    model.to("cpu")
+    print("✅ Model loaded successfully!")
+except Exception as e:
+    print(f"❌ Error loading model: {e}")
+    raise
 
 # ===============================
 # OBJECT SIZE RATIOS
@@ -134,4 +141,7 @@ def index():
 # ===============================
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
-    socketio.run(app, host="0.0.0.0", port=port)
+    print(f"🚀 Starting server on port {port}")
+    print(f"📁 Working directory: {os.getcwd()}")
+    print(f"📦 Files in directory: {os.listdir('.')}")
+    socketio.run(app, host="0.0.0.0", port=port, debug=False)

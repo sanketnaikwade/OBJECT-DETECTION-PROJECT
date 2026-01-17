@@ -1,12 +1,14 @@
 Flask==2.3.3
 flask-socketio==5.3.6
 eventlet==0.33.3
+Pillow==10.0.0
+gunicorn==21.2.0
 
-ultralytics==8.1.3
 opencv-python-headless==4.9.0.80
 numpy==1.26.4
 
+# PyTorch CPU versions (smaller footprint for deployment)
 torch==2.1.0
 torchvision==0.16.0
 
-gunicorn==21.2.0
+ultralytics==8.1.3

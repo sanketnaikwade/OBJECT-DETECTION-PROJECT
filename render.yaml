@@ -3,7 +3,11 @@ services:
     name: object-detection-app
     runtime: python
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn -k eventlet -w 1 --timeout 300 --bind 0.0.0.0:$PORT main:app
+    startCommand: python main.py
     envVars:
       - key: FLASK_ENV
         value: production
+      - key: YOLO_CONFIG_DIR
+        value: /tmp
+      - key: ULTRALYTICS_CACHE_DIR
+        value: /tmp
