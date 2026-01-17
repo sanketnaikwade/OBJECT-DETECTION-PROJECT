@@ -7,8 +7,9 @@ gunicorn==21.2.0
 opencv-python-headless==4.9.0.80
 numpy==1.26.4
 
-# PyTorch CPU versions (smaller footprint for deployment)
-torch==2.1.0
-torchvision==0.16.0
+# PyTorch CPU-only versions (no CUDA, much smaller)
+--extra-index-url https://download.pytorch.org/whl/cpu
+torch==2.1.0+cpu
+torchvision==0.16.0+cpu
 
 ultralytics==8.1.3
